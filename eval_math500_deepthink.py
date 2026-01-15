@@ -39,10 +39,27 @@ Constraints on the Answer:
 # -----------------------------
 # Answer parsing / normalization
 # -----------------------------
-BOXED_ANY_RE = re.compile(r"\\boxed\{(.+?)\}")
 FRAC_RE = re.compile(r"\\frac\{([-+]?\d+)\}\{([-+]?\d+)\}")
 PLAIN_FRAC_RE = re.compile(r"^([-+]?\d+)\/([-+]?\d+)$")
 FLOAT_RE = re.compile(r"^[-+]?\d+(\.\d+)?$")
+
+def extract_boxed_answer(text: str) -> Optional[str]:
+    """Extract content from \\boxed{...}, handling nested braces correctly."""
+    idx = text.find("\\boxed{")
+    if idx == -1:
+        return None
+    start = idx + len("\\boxed{")
+    depth = 1
+    i = start
+    while i < len(text) and depth > 0:
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+        i += 1
+    if depth == 0:
+        return text[start:i-1].strip()
+    return None
 
 def extract_pred_answer(text: str) -> Optional[str]:
     # 1) Prefer <SOLUTION> ... </SOLUTION> (allow end tag missing due to stop removal)
@@ -52,17 +69,22 @@ def extract_pred_answer(text: str) -> Optional[str]:
             seg = seg.split(SOLUTION_END, 1)[0]
         return seg.strip()
 
-    # 2) \boxed{...}
-    m = BOXED_ANY_RE.search(text)
-    if m:
-        return m.group(1).strip()
+    # 2) \boxed{...} (with nested brace handling)
+    boxed = extract_boxed_answer(text)
+    if boxed:
+        return boxed
 
     # 3) fallback: None
     return None
 
-def is_format_ok(text: str) -> bool:
-    # same spirit as your GSM8K script: require at least reasoning + solution start
-    return (REASONING_START in text) and (SOLUTION_START in text)
+def is_format_ok(text: str, force_prefix: bool = False) -> bool:
+    """
+    Check if the generated text follows the expected format.
+    When force_prefix=True, <start_deepthink> was already prepended to the prompt,
+    so we don't require it in the generated output.
+    """
+    has_reasoning = (REASONING_START in text) or force_prefix
+    return has_reasoning and (SOLUTION_START in text)
 
 def _strip_math_delims(s: str) -> str:
     s = s.strip()
@@ -84,35 +106,88 @@ def normalize_answer(s: Optional[str]) -> Optional[str]:
     s = s.replace("\\left", "").replace("\\right", "")
 
     # remove common latex spacing
-    s = s.replace("\\,", "").replace("\\!", "")
+    s = s.replace("\\,", "").replace("\\!", "").replace("\\;", "").replace("\\:", "").replace("\\ ", "")
+
+    # remove \text{...} and \mathrm{...} wrappers, keep content
+    s = re.sub(r"\\text\{([^}]*)\}", r"\1", s)
+    s = re.sub(r"\\mathrm\{([^}]*)\}", r"\1", s)
+    s = re.sub(r"\\textbf\{([^}]*)\}", r"\1", s)
+    s = re.sub(r"\\mathbf\{([^}]*)\}", r"\1", s)
+
+    # normalize multiplication symbols
+    s = s.replace("\\times", "*").replace("\\cdot", "*")
+
+    # normalize common constants
+    s = s.replace("\\pi", "pi").replace("\\infty", "inf")
+
+    # remove \displaystyle, \dfrac -> \frac
+    s = s.replace("\\displaystyle", "")
+    s = re.sub(r"\\dfrac", r"\\frac", s)
+    s = re.sub(r"\\tfrac", r"\\frac", s)
 
     # collapse whitespace
     s = re.sub(r"\s+", "", s)
     return s
 
+# Additional regex patterns for try_parse_number
+SCIENTIFIC_RE = re.compile(r"^([-+]?\d+(?:\.\d+)?)[eE]([-+]?\d+)$")  # 1e-5, 2.5E10
+LATEX_POWER_RE = re.compile(r"^([-+]?\d+(?:\.\d+)?)\*?10\^\{?([-+]?\d+)\}?$")  # 10^{-5}, 2*10^3
+SQRT_INT_RE = re.compile(r"^\\sqrt\{(\d+)\}$")  # \sqrt{4}
+PERCENT_RE = re.compile(r"^([-+]?\d+(?:\.\d+)?)\\?%$")  # 50%, 50\%
+
 def try_parse_number(norm: Optional[str]) -> Optional[float]:
     if norm is None:
         return None
 
-    # \frac{a}{b}
-    m = FRAC_RE.fullmatch(norm)
-    if m:
-        a = int(m.group(1))
-        b = int(m.group(2))
-        if b != 0:
-            return a / b
+    try:
+        # \frac{a}{b}
+        m = FRAC_RE.fullmatch(norm)
+        if m:
+            a = int(m.group(1))
+            b = int(m.group(2))
+            if b != 0:
+                return a / b
 
-    # a/b
-    m = PLAIN_FRAC_RE.fullmatch(norm)
-    if m:
-        a = int(m.group(1))
-        b = int(m.group(2))
-        if b != 0:
-            return a / b
+        # a/b
+        m = PLAIN_FRAC_RE.fullmatch(norm)
+        if m:
+            a = int(m.group(1))
+            b = int(m.group(2))
+            if b != 0:
+                return a / b
 
-    # integer/float
-    if FLOAT_RE.fullmatch(norm):
-        return float(norm)
+        # integer/float
+        if FLOAT_RE.fullmatch(norm):
+            return float(norm)
+
+        # scientific notation: 1e-5, 2.5E10
+        m = SCIENTIFIC_RE.fullmatch(norm)
+        if m:
+            base = float(m.group(1))
+            exp = int(m.group(2))
+            return base * (10 ** exp)
+
+        # LaTeX power: 10^{-5}, 2*10^3
+        m = LATEX_POWER_RE.fullmatch(norm)
+        if m:
+            base = float(m.group(1))
+            exp = int(m.group(2))
+            return base * (10 ** exp)
+
+        # \sqrt{n} for perfect squares
+        m = SQRT_INT_RE.fullmatch(norm)
+        if m:
+            import math
+            n = int(m.group(1))
+            return math.sqrt(n)
+
+        # percentage: 50% -> 0.5
+        m = PERCENT_RE.fullmatch(norm)
+        if m:
+            return float(m.group(1)) / 100.0
+
+    except (ValueError, OverflowError):
+        pass
 
     return None
 
@@ -281,7 +356,7 @@ def evaluate_math500_vllm(
         )
 
         for ex, gold, pred_text in zip(batch, golds, pred_texts):
-            fmt_ok = is_format_ok(pred_text)
+            fmt_ok = is_format_ok(pred_text, force_prefix=force_prefix)
             fmt_ok_cnt += int(fmt_ok)
 
             pred_ans = extract_pred_answer(pred_text) if (fmt_ok or not strict_format) else None

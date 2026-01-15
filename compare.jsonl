@@ -795,5 +795,14 @@ Evaluating /root/autodl-tmp/models/Qwen3-1.7B: 100%|█| 500/500 [10:00<00:00,  
 Delta (MODEL - COMPARE): +0.1020
 Saved compare jsonl: compare.jsonl
 
+[MODEL] /root/autodl-tmp/dapo_merged
+  Accuracy (normalized exact / numeric-fallback): 0.4840
+  Format OK rate: 0.842
+--------------------------
+[MODEL] /root/autodl-tmp/dapo_merged
+  Accuracy (normalized exact / numeric-fallback): 0.6360
+  Format OK rate: 0.898
 
-0.6440
+[MODEL] /root/autodl-tmp/model
+  Accuracy (normalized exact / numeric-fallback): 0.6080
+  Format OK rate: 0.724
