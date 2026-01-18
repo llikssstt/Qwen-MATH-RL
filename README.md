@@ -8,7 +8,7 @@
 
 1. **[download_qwen3_from_mirror.py](download_qwen3_from_mirror.py)** - 从 Hugging Face 镜像下载 Qwen3 模型
 2. **[eval_math500_deepthink.py](eval_math500_deepthink.py)** - 在 MATH-500 数据集上评测模型，支持单模型或多模型对比
-3. **[qwen30.5B.ipynb](qwen30.5B.ipynb)** - Jupyter Notebook，展示推理过程、数据分析和可视化
+3. **[qwen3-1.7B.ipynb](qwen3-1.7B.ipynb)** - Jupyter Notebook，展示推理过程、数据分析和可视化
 
 ### 数据文件
 
@@ -65,11 +65,11 @@ python eval_math500_deepthink.py \
 
 # 两个模型对比
 python eval_math500_deepthink.py \
-  --model ./models/ModelA \
-  --compare_model ./models/ModelB \
-  --batch_size 8 \
+  --model /root/autodl-tmp/models/Qwen3-1.7B \
+  --compare_model /root/autodl-tmp/SFT_merged_qwen3_1.7B \
+  --batch_size 16 \
   --save_jsonl output_a.jsonl \
-  --save_jsonl_compare compare.jsonl
+  --save_jsonl_compare compare_sft.jsonl
 ```
 
 **关键参数：**

@@ -788,21 +788,18 @@ Adding requests: 100%|███████████████████�
 Processed prompts: 100%|█| 4/4 [00:09<00:00,  2.29s/it, est. speed input: 76.32 toks/s, output: 765.61 to
 Evaluating /root/autodl-tmp/models/Qwen3-1.7B: 100%|█| 500/500 [10:00<00:00,  1.20s/q, acc=0.5060, fmt=0.
 [rank0]:[W1222 23:25:56.832862283 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
-[COMPARE] /root/autodl-tmp/models/Qwen3-1.7B
-  Accuracy: 0.5060
-  Format OK rate: 0.388
+[MODEL] /root/autodl-tmp/models/Qwen3-1.7B
+  Accuracy (normalized exact / numeric-fallback): 0.6400
+  Format OK rate: 0.492
 --------------------------------------------------------------------------------
 Delta (MODEL - COMPARE): +0.1020
 Saved compare jsonl: compare.jsonl
 
-[MODEL] /root/autodl-tmp/dapo_merged
-  Accuracy (normalized exact / numeric-fallback): 0.4840
-  Format OK rate: 0.842
---------------------------
-[MODEL] /root/autodl-tmp/dapo_merged
-  Accuracy (normalized exact / numeric-fallback): 0.6360
-  Format OK rate: 0.898
+[COMPARE] /root/autodl-tmp/SFT_merged_qwen3_1.7B
+  Accuracy: 0.4980
+  Format OK rate: 0.852
 
-[MODEL] /root/autodl-tmp/model
-  Accuracy (normalized exact / numeric-fallback): 0.6080
-  Format OK rate: 0.724
+
+[MODEL] /root/autodl-tmp/grpo_merge
+  Accuracy (normalized exact / numeric-fallback): 0.7080
+  Format OK rate: 0.844
